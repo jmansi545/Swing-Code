@@ -1,0 +1,92 @@
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.sql.*;
+import java.util.Properties;
+
+public class NewDashboard extends JFrame {
+
+    private JComboBox<String> comboBox1;
+    private JComboBox<String> comboBox2;
+    private JTable dbResultTableLeft;
+    private JTable dbResultTableRight;
+    private JTextField searchField;
+
+    public NewDashboard() {
+        setTitle("Dashboard");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(800, 400);
+        setLocationRelativeTo(null);
+
+        // Create JTabbedPane
+        JTabbedPane tabbedPane = new JTabbedPane();
+
+        // Create JPanel for each tab
+        JPanel dbPanel = new JPanel(new BorderLayout());
+        JPanel csvPanel = new JPanel(new BorderLayout());
+
+        // Add tabs to the tabbed pane
+        tabbedPane.addTab("Upload CSV", csvPanel);
+        tabbedPane.addTab("Comparison result", dbPanel);
+
+        JPanel comboBoxPanel = new JPanel(new GridLayout(1, 2));
+        comboBox1 = new JComboBox<>();
+        comboBox2 = new JComboBox<>();
+        comboBoxPanel.add(comboBox1);
+        comboBoxPanel.add(comboBox2);
+
+        JPanel searchPanel = new JPanel(new GridLayout(1, 2));
+        searchField = new JTextField(15);
+        JButton searchButton = new JButton("Search");
+        searchButton.addActionListener(this::searchInTables);
+        searchPanel.add(searchField);
+        searchPanel.add(searchButton);
+
+        JPanel tablePanel = new JPanel(new GridLayout(1, 2));
+        dbResultTableLeft = new JTable();
+        dbResultTableRight = new JTable();
+        tablePanel.add(new JScrollPane(dbResultTableLeft));
+        tablePanel.add(new JScrollPane(dbResultTableRight));
+
+        dbPanel.add(comboBoxPanel, BorderLayout.NORTH);
+        dbPanel.add(searchPanel, BorderLayout.CENTER);
+        dbPanel.add(tablePanel, BorderLayout.SOUTH);
+
+        csvPanel.setLayout(new BorderLayout());
+
+        // Add tabbed pane to the frame
+        add(tabbedPane);
+    }
+
+    private void searchInTables(ActionEvent e) {
+        String searchText = searchField.getText();
+        searchInTable(dbResultTableLeft, searchText);
+        searchInTable(dbResultTableRight, searchText);
+    }
+
+    private void searchInTable(JTable table, String searchText) {
+        DefaultTableModel model = (DefaultTableModel) table.getModel();
+        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(model);
+        table.setRowSorter(sorter);
+        if (searchText.trim().length() == 0) {
+            sorter.setRowFilter(null);
+        } else {
+            sorter.setRowFilter(RowFilter.regexFilter("(?i)" + searchText.trim()));
+        }
+    }
+
+    // Other methods remain unchanged...
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            NewDashboard example = new NewDashboard();
+            example.setVisible(true);
+        });
+    }
+}
