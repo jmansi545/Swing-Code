@@ -1,0 +1,697 @@
+package com.lti.demo;
+
+import java.awt.BorderLayout;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.GridLayout;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileReader;
+import java.io.IOException;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.ResultSetMetaData;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+
+import javax.swing.BorderFactory;
+import javax.swing.DefaultComboBoxModel;
+import javax.swing.JButton;
+import javax.swing.JComboBox;
+import javax.swing.JDialog;
+import javax.swing.JFileChooser;
+import javax.swing.JFrame;
+import javax.swing.JLabel;
+import javax.swing.JOptionPane;
+import javax.swing.JPanel;
+import javax.swing.JPasswordField;
+import javax.swing.JProgressBar;
+import javax.swing.JScrollPane;
+import javax.swing.JTabbedPane;
+import javax.swing.JTable;
+import javax.swing.JTextField;
+import javax.swing.RowFilter;
+import javax.swing.SwingUtilities;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
+
+import oracle.jdbc.driver.OracleConnection;
+import oracle.jdbc.driver.OracleDriver;
+import oracle.net.ano.AnoServices;
+
+public class NewDashboard extends JFrame {
+
+                private JComboBox<String> comboBox1;
+                private JComboBox<String> comboBox2;
+                private JTable dbResultTableLeft;
+                private JTable dbResultTableRight;
+                private JTable csvResultTableForButton1;
+                private JTable csvResultTableForButton2;
+                private JButton uploadButton1;
+                private JButton uploadButton2;
+                private JTextField dbUrlField;
+                private JTextField usernameField;
+                private JPasswordField passwordField;
+                private JTextField searchField;
+                
+                public NewDashboard() {
+                                setTitle("Dashboard");
+                                setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+                                setSize(800, 400);
+                                setLocationRelativeTo(null);
+                                // Create JTabbedPane
+                                JTabbedPane tabbedPane = new JTabbedPane();
+
+                                // Create JPanel for each tab
+                                JPanel dbPanel = new JPanel(new BorderLayout());
+                                JPanel csvPanel = new JPanel(new BorderLayout());
+
+                                // Add tabs to the tabbed pane
+                                tabbedPane.addTab("Upload CSV", csvPanel);
+                                tabbedPane.addTab("Comparison result", dbPanel);
+
+                                JLabel spaceLabel = new JLabel();
+                                spaceLabel.setPreferredSize(new Dimension(10, 10));
+                                
+        JPanel leftPanel = new JPanel(new FlowLayout());
+        JPanel rightPanel = new JPanel(new FlowLayout());
+        
+       
+        
+                                // Create the CSV result tables
+                                csvResultTableForButton1 = new JTable();
+                                csvResultTableForButton2 = new JTable();
+
+                                // Create the upload buttons
+                                uploadButton1 = new JButton("Upload File ");
+                                uploadButton1.addActionListener(e -> uploadFile(1));
+                                uploadButton1.setPreferredSize(new Dimension(120, 30));
+
+                                uploadButton2 = new JButton("Upload File ");
+                                uploadButton2.addActionListener(e -> uploadFile(2));
+                                uploadButton2.setPreferredSize(new Dimension(120, 30));
+                                
+                                
+                                
+
+                                dbUrlField = new JTextField();
+                                usernameField = new JTextField();
+                                passwordField = new JPasswordField();
+
+                                JPanel dbcontPanel = new JPanel(new GridLayout(4, 2));
+                                dbcontPanel.add(new JLabel("Database URL:"));
+                                dbcontPanel.add(dbUrlField);
+                                dbcontPanel.add(new JLabel("Username:"));
+                                dbcontPanel.add(usernameField);
+                                dbcontPanel.add(new JLabel("Password:"));
+                                dbcontPanel.add(passwordField);
+                                JButton connectButton = new JButton("Submit");
+                                                connectButton.addActionListener(e -> {
+                                                                connectToDatabase();
+                                                });
+                                dbcontPanel.add(connectButton, BorderLayout.NORTH);
+                                
+                                
+
+                                // Create a panel for the upload buttons
+                                JPanel buttonPanel = new JPanel(new GridLayout(2, 1));
+                                buttonPanel.add(uploadButton1);
+                                buttonPanel.add(uploadButton2);
+
+                                // Create JComboBoxes
+        comboBox1 = new JComboBox<>();
+        comboBox2 = new JComboBox<>();
+        comboBox1.setPreferredSize(new Dimension(190, 30));
+        comboBox2.setPreferredSize(new Dimension(190, 30));
+        JLabel label1 = new JLabel("Select OBIEE Filter");
+        JLabel label2 = new JLabel("Select PBI Filter");
+        comboBox1.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        comboBox2.setBorder(BorderFactory.createEmptyBorder(0,0,0,10));
+        leftPanel.add(label1);
+        leftPanel.add(comboBox1);
+        rightPanel.add(label2);
+        rightPanel.add(comboBox2);
+        
+        comboBox1.addActionListener(e-> {
+               String selectedColumn = (String) comboBox1.getSelectedItem();
+               if(selectedColumn != null) {
+                               try {
+                                                                                oracleColumnProperties(selectedColumn);
+                                                                } catch (SQLException e1) {
+                                                                                // TODO Auto-generated catch block
+                                                                                e1.printStackTrace();
+                                                                }
+               }
+        });
+        comboBox2.addActionListener(e-> {
+               String selectedColumn = (String) comboBox2.getSelectedItem();
+               if(selectedColumn != null) {
+                               try {
+                                                                                denodoColumnProperties(selectedColumn);
+                                                                } catch (SQLException e1) {
+                                                                                // TODO Auto-generated catch block
+                                                                                e1.printStackTrace();
+                                                                }
+               }
+        });
+        dbResultTableLeft = new JTable();
+        dbResultTableRight = new JTable();
+
+        JScrollPane scrollPaneLeft = new JScrollPane(dbResultTableLeft);
+        JScrollPane scrollPaneRight = new JScrollPane(dbResultTableRight);
+
+                                leftPanel.add(scrollPaneLeft, BorderLayout.CENTER);
+                                rightPanel.add(scrollPaneRight, BorderLayout.CENTER);
+
+        JPanel searchPanelLeft = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel searchPanelRight = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+
+        searchField = new JTextField(15);
+        JButton searchButtonLeft = new JButton("Search");
+        JButton searchButtonRight = new JButton("Search");
+
+        searchButtonLeft.addActionListener(e -> searchInTable(dbResultTableLeft, searchField.getText()));
+        searchButtonRight.addActionListener(e -> searchInTable(dbResultTableRight, searchField.getText()));
+
+        searchPanelLeft.add(new JLabel("Search: "));
+        searchPanelLeft.add(searchField);
+        searchPanelLeft.add(searchButtonLeft);
+
+        searchPanelRight.add(new JLabel("Search: "));
+        searchPanelRight.add(searchField);
+        searchPanelRight.add(searchButtonRight);
+
+        leftPanel.add(searchPanelLeft, BorderLayout.NORTH);
+        rightPanel.add(searchPanelRight, BorderLayout.NORTH);
+        
+                                dbPanel.add(dbcontPanel, BorderLayout.NORTH);
+        dbPanel.add(leftPanel, BorderLayout.WEST);
+        dbPanel.add(rightPanel,BorderLayout.EAST);
+                                csvPanel.setLayout(new BorderLayout());
+
+                                // Create panels for each CSV result table
+                                JPanel csvPanel1 = createCsvPanel("CSV Result", csvResultTableForButton1);
+                                JPanel csvPanel2 = createCsvPanel("CSV Result", csvResultTableForButton2);
+
+                                // Add panels to csvPanel
+                                JPanel csvTablesPanel = new JPanel(new GridLayout(2, 1));
+                                csvTablesPanel.add(csvPanel1);
+                                csvTablesPanel.add(csvPanel2);
+                                csvPanel.add(csvTablesPanel, BorderLayout.CENTER);
+
+                                JPanel csvButtonPanel = new JPanel(new FlowLayout());
+                                csvButtonPanel.add(uploadButton1);
+                                csvButtonPanel.add(uploadButton2);
+                                csvPanel.add(csvButtonPanel, BorderLayout.NORTH);
+
+                                // Add tabbed pane to the frame
+                                add(tabbedPane);
+                }
+                
+                private void searchInTable(JTable table, String searchText) {
+        DefaultTableModel model = (DefaultTableModel) table.getModel();
+        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(model);
+        table.setRowSorter(sorter);
+        if (searchText.trim().length() == 0) {
+            sorter.setRowFilter(null);
+        } else {
+            sorter.setRowFilter(RowFilter.regexFilter("(?i)" + searchText.trim()));
+        }
+    }
+
+                private void uploadFile(int buttonNumber) {
+                                JFileChooser fileChooser = new JFileChooser();
+                                fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+
+                                int result = fileChooser.showOpenDialog(this);
+                                if (result == JFileChooser.APPROVE_OPTION) {
+                                                File selectedFile = fileChooser.getSelectedFile();
+                                                processCSVFile(selectedFile, buttonNumber);
+                                }
+                }
+
+                private void processCSVFile(File file, int buttonNumber) {
+                                DefaultTableModel model = new DefaultTableModel();
+
+                                try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+                                                String line;
+                                                if ((line = br.readLine()) != null) {
+                                                                String[] columnNames = line.split(",");
+                                                                for (String columnName : columnNames) {
+                                                                                model.addColumn(columnName.trim());
+                                                                }
+//                String[] data = line.split(",");
+//                model.addRow(data);
+                                                }
+                                                while ((line = br.readLine()) != null) {
+                                                                String[] data = line.split(",");
+                                                                model.addRow(data);
+                                                }
+                                } catch (IOException e) {
+                                                e.printStackTrace();
+                                }
+
+                                // Display CSV data in the corresponding table
+                                if (buttonNumber == 1) {
+                                                csvResultTableForButton1.setModel(model);
+                                } else if (buttonNumber == 2) {
+                                                csvResultTableForButton2.setModel(model);
+                                }
+                }
+
+                private JPanel createCsvPanel(String title, JTable table) {
+                                JPanel panel = new JPanel(new BorderLayout());
+                                panel.setBorder(BorderFactory.createTitledBorder(title));
+                                JScrollPane scrollPane = new JScrollPane(table);
+                                panel.add(scrollPane, BorderLayout.CENTER);
+                                return panel;
+                }
+                
+                
+                
+                private void connectToDatabase() {
+                                String dbUrl = dbUrlField.getText();
+                                String username = usernameField.getText();
+                                String password = new String(passwordField.getPassword());
+                                Connection connection= null;
+                                try {
+                                                
+                                                if (dbUrl.toLowerCase().contains("oracle")) {
+                                                                // Connect to Oracle database
+                                                                Class.forName("oracle.jdbc.driver.OracleDriver");
+                                                                OracleDriver driver = new OracleDriver();
+                                                                Properties prop = new Properties();
+
+                                                                prop.setProperty(OracleConnection.CONNECTION_PROPERTY_THIN_NET_AUTHENTICATION_SERVICES,
+                                                                                                "(" + AnoServices.AUTHENTICATION_KERBEROS5 + ")");
+                                                                prop.setProperty(OracleConnection.CONNECTION_PROPERTY_THIN_NET_AUTHENTICATION_SERVICES,
+                                                                                                "( " + AnoServices.AUTHENTICATION_KERBEROS5 + " )");
+                                                                prop.setProperty(OracleConnection.CONNECTION_PROPERTY_THIN_NET_AUTHENTICATION_KRB5_MUTUAL, "true");
+                                                                connection = driver.connect(dbUrl, prop);
+                                                                JOptionPane.showMessageDialog(this, "Connected to the database successfully!");
+                                                                
+                                                                String query = "Select * from ODS.m5_vendor";                                 
+                                                                Statement statement = connection.createStatement();
+                                                                ResultSet resultSet = statement.executeQuery(query);
+                                                                ResultSetMetaData metaData =  resultSet.getMetaData();
+                                                                int columnCount = metaData.getColumnCount();
+                                                                
+                              for(int i=1; i<=columnCount; i++) {
+                                String columnName = resultSet.getMetaData().getColumnName(i);
+                                comboBox1.addItem(columnName);
+                              }
+                              resultSet.close();
+                              statement.close();
+                                                                
+
+                                                }else if (dbUrl.toLowerCase().contains("vdb")) {
+                                                                // Connect to Denodo database
+                                                                Class.forName("com.denodo.vdp.jdbc.Driver");
+                                                                connection = DriverManager.getConnection(dbUrl, username, password);
+                                                                JOptionPane.showMessageDialog(this, "Connected to the database successfully!");
+                                                                String query = "Select * from dim_mntc_vnd";
+                                                                Statement statement = connection.createStatement();
+                                                                ResultSet resultSet = statement.executeQuery(query);
+                                                                ResultSetMetaData metaData =  resultSet.getMetaData();
+                                                                  int columnCount = metaData.getColumnCount();
+                                                
+                              for(int i=1; i<=columnCount; i++) {
+                                String columnNames = resultSet.getMetaData().getColumnName(i);
+                                comboBox2.addItem(columnNames);
+                              }
+                              resultSet.close();
+                              statement.close();
+                                                                
+                                                } else {
+                                                                // Unknown database type, handle accordingly
+                                                                JOptionPane.showMessageDialog(this, "Unsupported database type!", "Error", JOptionPane.ERROR_MESSAGE);
+                                                                return;
+                                                }
+                                                // Close the connection if needed
+                                                connection.close();
+                                } catch (ClassNotFoundException e) {
+                                                JOptionPane.showMessageDialog(this, "Database driver not found: " + e.getMessage(), "Error",
+                                                                                JOptionPane.ERROR_MESSAGE);
+                                                e.printStackTrace();
+                                } catch (SQLException e) {
+                                                JOptionPane.showMessageDialog(this, "Failed to connect to the database: " + e.getMessage(), "Error",
+                                                                                JOptionPane.ERROR_MESSAGE);
+                                                e.printStackTrace();
+                                }
+                }
+                
+                private void oracleColumnProperties(String selectedColumn) throws SQLException {
+                                String dbUrl = "jdbc:oracle:thin:@uatcrs180:1521/hstu0.world";
+                                Connection connection= null ;
+                                Statement statement= null;
+                                ResultSet resultSet= null;
+                                try {
+                                                Class.forName("oracle.jdbc.driver.OracleDriver");
+                                
+                                OracleDriver driver = new OracleDriver();
+                                Properties prop = new Properties();
+
+                                prop.setProperty(OracleConnection.CONNECTION_PROPERTY_THIN_NET_AUTHENTICATION_SERVICES,
+                                                                "(" + AnoServices.AUTHENTICATION_KERBEROS5 + ")");
+                                prop.setProperty(OracleConnection.CONNECTION_PROPERTY_THIN_NET_AUTHENTICATION_SERVICES,
+                                                                "( " + AnoServices.AUTHENTICATION_KERBEROS5 + " )");
+                                prop.setProperty(OracleConnection.CONNECTION_PROPERTY_THIN_NET_AUTHENTICATION_KRB5_MUTUAL, "true");
+                                connection = driver.connect(dbUrl, prop);
+                                DefaultTableModel modelLeft = new DefaultTableModel();
+//                            while (resultSet.next()) {
+                                                // String city = resultSet.getString("CITY");
+                                                //String city = resultSet.getString(8);
+                                                String cityQuery = "SELECT DISTINCT " + selectedColumn + ",COUNT(" + selectedColumn
+                                                                                + ")FROM ODS.M5_VENDOR GROUP BY " + selectedColumn + " ORDER BY " +selectedColumn+" ASC";
+                                                statement = connection.createStatement();
+                                                resultSet = statement.executeQuery(cityQuery);
+                                                //List<String> columnValues = new ArrayList<>();
+                                                while (resultSet.next()) {
+                                                                //columnValues.add(resultSet.getString(1) + "," + resultSet.getString(2));
+                                                                String columns = resultSet.getString(1) + "," + resultSet.getString(2);
+                                                                modelLeft.addRow(new Object[] {columns});
+                                                                System.out.println("Oracle City result: " + resultSet.getString(1) + "," + resultSet.getString(2));
+                                                }
+                                                dbResultTableLeft.setModel(modelLeft);
+                                                } catch (ClassNotFoundException e) {
+                                                                // TODO Auto-generated catch block
+                                                                e.printStackTrace();
+                                                }finally {
+                                                                resultSet.close();
+                                                                statement.close();
+                                                                connection.close();
+                                                }
+//}
+                }
+                private void denodoColumnProperties(String selectedColumn) throws SQLException {
+                                String dbUrl = dbUrlField.getText();
+                                String username = usernameField.getText();
+                                String password = new String(passwordField.getPassword());
+                                Connection connection = null ;
+                                try {
+                                                Class.forName("com.denodo.vdp.jdbc.Driver");
+                                
+                                connection = DriverManager.getConnection(dbUrl, username, password);
+//                            while (resultSet.next()) {
+//                                                            String city = resultSet.getString(16);
+                                                                String cityQuery = "SELECT DISTINCT "+selectedColumn +",COUNT("+ selectedColumn
+                                                                                                +")FROM dim_mntc_vnd GROUP BY "+selectedColumn + " ORDER BY " +selectedColumn+" ASC";
+                                                                Statement cityStatement = connection.createStatement();
+                                                                ResultSet cityResultSet = cityStatement.executeQuery(cityQuery);
+                                                                while (cityResultSet.next()) {
+                   String values =  cityResultSet.getString(1) + "," + cityResultSet.getString(2);
+                                                                                System.out.println(
+                                                                                                                "Denodo City result: " + cityResultSet.getString(1) + "," + cityResultSet.getString(2));
+                                                                //}
+                                                                                
+
+                                                }
+                                                cityResultSet.close();
+                                                cityStatement.close();
+                
+                                } catch (ClassNotFoundException e) {
+                                // TODO Auto-generated catch block
+                                e.printStackTrace();
+                }finally {
+                                
+                                connection.close();
+                }
+                }
+
+                public static void main(String[] args) {
+                                SwingUtilities.invokeLater(() -> {
+                                                NewDashboard example = new NewDashboard();
+                                                example.setVisible(true);
+                                });
+                }
+}
+
+From: Mansi Jain <Mansi.Jain@ltimindtree.com> 
+Sent: Thursday, February 29, 2024 7:42 AM
+To: Jain, Mansi <jainm@schneider.com>
+Subject: search panel
+
+	CAUTION: This email originated from outside the organization. Do not click links or open attachments unless you recognize the sender and know the content is safe. 
+import javax.swing.*;
+import javax.swing.table.DefaultTableModel;
+import javax.swing.table.TableRowSorter;
+import java.awt.*;
+import java.awt.event.ActionEvent;
+import java.awt.event.ActionListener;
+import java.io.*;
+import java.sql.*;
+import java.util.Properties;
+ 
+public class NewDashboard extends JFrame {
+ 
+    private JComboBox<String> comboBox1;
+    private JComboBox<String> comboBox2;
+    private JTable dbResultTableLeft;
+    private JTable dbResultTableRight;
+    private JTable csvResultTableForButton1;
+    private JTable csvResultTableForButton2;
+    private JButton uploadButton1;
+    private JButton uploadButton2;
+    private JTextField dbUrlField;
+    private JTextField usernameField;
+    private JPasswordField passwordField;
+    private JTextField searchField;
+ 
+    public NewDashboard() {
+        setTitle("Dashboard");
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        setSize(800, 400);
+        setLocationRelativeTo(null);
+ 
+        // Create JTabbedPane
+        JTabbedPane tabbedPane = new JTabbedPane();
+ 
+        // Create JPanel for each tab
+        JPanel dbPanel = new JPanel(new BorderLayout());
+        JPanel csvPanel = new JPanel(new BorderLayout());
+ 
+        // Add tabs to the tabbed pane
+        tabbedPane.addTab("Upload CSV", csvPanel);
+        tabbedPane.addTab("Comparison result", dbPanel);
+ 
+        // Create the CSV result tables
+        csvResultTableForButton1 = new JTable();
+        csvResultTableForButton2 = new JTable();
+ 
+        // Create the upload buttons
+        uploadButton1 = new JButton("Upload File ");
+        uploadButton1.addActionListener(e -> uploadFile(1));
+        uploadButton1.setPreferredSize(new Dimension(120, 30));
+ 
+        uploadButton2 = new JButton("Upload File ");
+        uploadButton2.addActionListener(e -> uploadFile(2));
+        uploadButton2.setPreferredSize(new Dimension(120, 30));
+ 
+        dbUrlField = new JTextField();
+        usernameField = new JTextField();
+        passwordField = new JPasswordField();
+ 
+        JButton connectButton = new JButton("Submit");
+        connectButton.addActionListener(e -> connectToDatabase());
+        connectButton.setPreferredSize(new Dimension(10, 30));
+ 
+        JPanel dbcontPanel = new JPanel(new GridLayout(4, 2));
+        dbcontPanel.add(new JLabel("Database URL:"));
+        dbcontPanel.add(dbUrlField);
+        dbcontPanel.add(new JLabel("Username:"));
+        dbcontPanel.add(usernameField);
+        dbcontPanel.add(new JLabel("Password:"));
+        dbcontPanel.add(passwordField);
+        dbcontPanel.add(connectButton, BorderLayout.NORTH);
+ 
+        JPanel buttonPanel = new JPanel(new GridLayout(2, 1));
+        buttonPanel.add(uploadButton1);
+        buttonPanel.add(uploadButton2);
+ 
+        dbPanel.add(dbcontPanel, BorderLayout.NORTH);
+ 
+        csvPanel.setLayout(new BorderLayout());
+ 
+        JPanel csvPanel1 = createCsvPanel("CSV Result", csvResultTableForButton1);
+        JPanel csvPanel2 = createCsvPanel("CSV Result", csvResultTableForButton2);
+ 
+        JPanel csvTablesPanel = new JPanel(new GridLayout(2, 1));
+        csvTablesPanel.add(csvPanel1);
+        csvTablesPanel.add(csvPanel2);
+csvPanel.add(csvTablesPanel, BorderLayout.CENTER);
+ 
+        JPanel csvButtonPanel = new JPanel(new FlowLayout());
+        csvButtonPanel.add(uploadButton1);
+        csvButtonPanel.add(uploadButton2);
+        csvPanel.add(csvButtonPanel, BorderLayout.NORTH);
+ 
+        comboBox1 = new JComboBox<>();
+        comboBox1.addActionListener(e -> {
+            String selectedColumn = (String) comboBox1.getSelectedItem();
+            if (selectedColumn != null) {
+                connectToDatabase(selectedColumn);
+            }
+        });
+ 
+        JPanel comboBoxPanel = new JPanel();
+        comboBoxPanel.add(new JLabel("Select Column: "));
+        comboBoxPanel.add(comboBox1);
+        dbPanel.add(comboBoxPanel, BorderLayout.WEST);
+ 
+        // Adding Left and Right panels with tables and search options
+        JPanel leftPanel = new JPanel(new BorderLayout());
+        JPanel rightPanel = new JPanel(new BorderLayout());
+ 
+        dbResultTableLeft = new JTable();
+        dbResultTableRight = new JTable();
+ 
+        JScrollPane scrollPaneLeft = new JScrollPane(dbResultTableLeft);
+        JScrollPane scrollPaneRight = new JScrollPane(dbResultTableRight);
+ 
+leftPanel.add(scrollPaneLeft, BorderLayout.CENTER);
+rightPanel.add(scrollPaneRight, BorderLayout.CENTER);
+ 
+        JPanel searchPanelLeft = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+        JPanel searchPanelRight = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+ 
+        searchField = new JTextField(15);
+        JButton searchButtonLeft = new JButton("Search");
+        JButton searchButtonRight = new JButton("Search");
+ 
+        searchButtonLeft.addActionListener(e -> searchInTable(dbResultTableLeft, searchField.getText()));
+        searchButtonRight.addActionListener(e -> searchInTable(dbResultTableRight, searchField.getText()));
+ 
+        searchPanelLeft.add(new JLabel("Search: "));
+        searchPanelLeft.add(searchField);
+        searchPanelLeft.add(searchButtonLeft);
+ 
+        searchPanelRight.add(new JLabel("Search: "));
+        searchPanelRight.add(searchField);
+        searchPanelRight.add(searchButtonRight);
+ 
+        leftPanel.add(searchPanelLeft, BorderLayout.NORTH);
+        rightPanel.add(searchPanelRight, BorderLayout.NORTH);
+ 
+dbPanel.add(leftPanel, BorderLayout.CENTER);
+        dbPanel.add(rightPanel, BorderLayout.EAST);
+ 
+        add(tabbedPane);
+    }
+ 
+    private void searchInTable(JTable table, String searchText) {
+        DefaultTableModel model = (DefaultTableModel) table.getModel();
+        TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(model);
+        table.setRowSorter(sorter);
+        if (searchText.trim().length() == 0) {
+            sorter.setRowFilter(null);
+        } else {
+            sorter.setRowFilter(RowFilter.regexFilter("(?i)" + searchText.trim()));
+        }
+    }
+ 
+    private void uploadFile(int buttonNumber) {
+        JFileChooser fileChooser = new JFileChooser();
+        fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+ 
+        int result = fileChooser.showOpenDialog(this);
+        if (result == JFileChooser.APPROVE_OPTION) {
+            File selectedFile = fileChooser.getSelectedFile();
+            processCSVFile(selectedFile, buttonNumber);
+        }
+    }
+ 
+    private void processCSVFile(File file, int buttonNumber) {
+        DefaultTableModel model = new DefaultTableModel();
+ 
+        try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+            String line;
+            if ((line = br.readLine()) != null) {
+                String[] columnNames = line.split(",");
+                for (String columnName : columnNames) {
+                    model.addColumn(columnName.trim());
+                }
+            }
+            while ((line = br.readLine()) != null) {
+                String[] data = line.split(",");
+                model.addRow(data);
+            }
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+ 
+        if (buttonNumber == 1) {
+            csvResultTableForButton1.setModel(model);
+        } else if (buttonNumber == 2) {
+            csvResultTableForButton2.setModel(model);
+        }
+    }
+ 
+    private JPanel createCsvPanel(String title, JTable table) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setBorder(BorderFactory.createTitledBorder(title));
+        JScrollPane scrollPane = new JScrollPane(table);
+panel.add(scrollPane, BorderLayout.CENTER);
+        return panel;
+    }
+ 
+    private void connectToDatabase(String selectedColumn) {
+        String dbUrl = dbUrlField.getText();
+        String username = usernameField.getText();
+        String password = new String(passwordField.getPassword());
+ 
+        try {
+            Connection connection;
+            if (dbUrl.toLowerCase().contains("oracle")) {
+                // Connect to Oracle database
+                Class.forName("oracle.jdbc.driver.OracleDriver");
+                OracleDriver driver = new OracleDriver();
+                Properties prop = new Properties();
+ 
+                connection = driver.connect(dbUrl, prop);
+ 
+                String query = "SELECT DISTINCT " + selectedColumn + " FROM YourTable";
+                Statement statement = connection.createStatement();
+                ResultSet resultSet = statement.executeQuery(query);
+ 
+                DefaultTableModel modelLeft = new DefaultTableModel();
+                DefaultTableModel modelRight = new DefaultTableModel();
+ 
+                modelLeft.addColumn(selectedColumn);
+                modelRight.addColumn(selectedColumn);
+ 
+                while (resultSet.next()) {
+                    String value = resultSet.getString(selectedColumn);
+                    modelLeft.addRow(new Object[]{value});
+                    modelRight.addRow(new Object[]{value});
+                }
+ 
+                dbResultTableLeft.setModel(modelLeft);
+                dbResultTableRight.setModel(modelRight);
+            } else {
+                // Handle other database types
+                JOptionPane.showMessageDialog(this, "Unsupported database type!", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+        } catch (ClassNotFoundException e) {
+            JOptionPane.showMessageDialog(this, "Database driver not found: " + e.getMessage(), "Error",
+                    JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
+        } catch (SQLException e) {
+            JOptionPane.showMessageDialog(this, "Failed to connect to the database: " + e.getMessage(), "Error",
+                    JOptionPane.ERROR_MESSAGE);
+            e.printStackTrace();
+        }
+    }
+ 
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            NewDashboard example = new NewDashboard();
+            example.setVisible(true);
+        });
+    }
+}
