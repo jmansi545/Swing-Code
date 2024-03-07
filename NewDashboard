@@ -1,0 +1,552 @@
+package com.lti.demo;
+
+import java.awt.*;
+import java.awt.event.*;
+import javax.swing.*;
+import javax.swing.table.*;
+
+import oracle.jdbc.driver.OracleConnection;
+import oracle.jdbc.driver.OracleDriver;
+import oracle.net.ano.AnoServices;
+
+import java.io.*;
+import java.sql.*;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.LinkedHashMap;
+import java.util.LinkedList;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+import java.util.regex.Pattern;
+
+
+public class NewDashboardDesign extends JFrame {
+	private JComboBox<String> comboBox1;
+	private JComboBox<String> comboBox2;
+	private JTable dbResultTableLeft;
+	private JTable dbResultTableRight;
+	private JTable csvResultTableForButton1;
+	private JTable csvResultTableForButton2;
+	private JButton uploadButton1;
+	private JButton uploadButton2;
+	private JTextField dbUrlField;
+	private JTextField usernameField;
+	private JPasswordField passwordField;
+	private JTextField denodoUrlField;
+	private JTextField denodoUsernameField;
+	private JPasswordField denodoPasswordField;
+	private JTextField searchFieldLeft;
+	private JTextField searchFieldRight;
+	private JButton searchButtonLeft;
+	private JButton searchButtonRight;
+	Map<String, String> denodoMap = new LinkedHashMap<String, String>();
+	Map<String, String> oracleMap = new LinkedHashMap<String, String>();
+
+	public NewDashboardDesign() {
+		setTitle("Dashboard");
+		setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		setSize(800, 400);
+		setLocationRelativeTo(null);
+        // Create JTabbedPane
+		JTabbedPane tabbedPane = new JTabbedPane();
+        // Create JPanel for each tab
+		JPanel csvPanel = new JPanel(new BorderLayout());
+		JPanel comparisonPanel = new JPanel(new BorderLayout());
+        // Add tabs to the tabbed pane
+		tabbedPane.addTab("Upload CSV", csvPanel);
+		tabbedPane.addTab("Comparison result", comparisonPanel);
+        // CSV Panel Components
+		csvResultTableForButton1 = new JTable();
+		csvResultTableForButton2 = new JTable();
+		uploadButton1 = new JButton("Upload File ");
+		uploadButton1.addActionListener(e -> uploadFile(1));
+		uploadButton2 = new JButton("Upload File ");
+		uploadButton2.addActionListener(e -> uploadFile(2));
+		JPanel csvButtonPanel = new JPanel(new FlowLayout());
+		csvButtonPanel.add(uploadButton1);
+		csvButtonPanel.add(uploadButton2);
+		JPanel csvTablesPanel = new JPanel(new GridLayout(2, 1));
+		csvTablesPanel.add(createCsvPanel("CSV Result 1", csvResultTableForButton1));
+		csvTablesPanel.add(createCsvPanel("CSV Result 2", csvResultTableForButton2));
+		csvPanel.add(csvButtonPanel, BorderLayout.NORTH);
+		csvPanel.add(csvTablesPanel, BorderLayout.CENTER);
+         // Comparison Panel Components
+		JPanel connectionPanel = new JPanel(new GridLayout(1, 2));
+        // Oracle Connection Panel
+		JPanel dbContPanel = new JPanel(new GridLayout(4, 2));
+		dbUrlField = new JTextField();
+		usernameField = new JTextField();
+		passwordField = new JPasswordField();
+		dbContPanel.add(new JLabel("Oracle Database URL:"));
+		dbContPanel.add(dbUrlField);
+		dbContPanel.add(new JLabel("Username:"));
+		dbContPanel.add(usernameField);
+		dbContPanel.add(new JLabel("Password:"));
+		dbContPanel.add(passwordField);
+        // Denodo Connection Panel
+		JPanel denodoContPanel = new JPanel(new GridLayout(4, 2)); // Add panel for Denodo connection details
+		denodoUrlField = new JTextField();
+		denodoUsernameField = new JTextField();
+		denodoPasswordField = new JPasswordField();
+		denodoContPanel.add(new JLabel("Denodo Database URL:")); // Label for Denodo DB
+		denodoContPanel.add(denodoUrlField);
+		denodoContPanel.add(new JLabel("Username:"));
+		denodoContPanel.add(denodoUsernameField);
+		denodoContPanel.add(new JLabel("Password:"));
+		denodoContPanel.add(denodoPasswordField);
+		connectionPanel.add(dbContPanel);
+		connectionPanel.add(denodoContPanel);
+        // Buttons for Connecting to Oracle and Denodo
+		JButton connectButton = new JButton("Connect (Oracle)");
+		connectButton.addActionListener(e -> {
+			try {
+				connectToOracleDatabase();
+			} catch (ClassNotFoundException e1) {
+				e1.printStackTrace();
+			} catch (SQLException e1) {
+				e1.printStackTrace();
+			}
+		});
+		JButton connectDenodoButton = new JButton("Connect (Denodo)");
+		connectDenodoButton.addActionListener(e -> {
+			try {
+				connectToDenodoDatabase();
+			} catch (SQLException | ClassNotFoundException e1) {
+				// TODO Auto-generated catch block
+				e1.printStackTrace();
+			}
+		});
+		JPanel dbButtonPanel = new JPanel(new FlowLayout(FlowLayout.CENTER));
+		dbButtonPanel.add(connectButton);
+		dbButtonPanel.add(connectDenodoButton);
+        // Combo Box Panel
+		JPanel comboBoxPanel = new JPanel(new GridLayout(1, 2));
+		comboBox1 = new JComboBox<>();
+		comboBox1.addItem("Select");
+		comboBox2 = new JComboBox<>();
+		comboBox2.addItem("Select");
+		comboBoxPanel.add(new JLabel("Select OBIEE Filter:"));
+		comboBoxPanel.add(comboBox1);
+		comboBoxPanel.add(new JLabel("Select PBI Filter:"));
+		comboBoxPanel.add(comboBox2);
+		comboBox1.addActionListener(e -> {
+			String selectedColumn = (String) comboBox1.getSelectedItem();
+			if (selectedColumn != null) {
+				try {
+					oracleColumnProperties(selectedColumn);
+				} catch (SQLException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+			}
+		});
+		comboBox2.addActionListener(e -> {
+			String selectedColumn = (String) comboBox2.getSelectedItem();
+			if (selectedColumn != null) {
+				try {
+					denodoColumnProperties(selectedColumn);
+				} catch (SQLException e1) {
+					// TODO Auto-generated catch block
+					e1.printStackTrace();
+				}
+			}
+		});
+// Add the new Denodo connect button
+		JPanel comparisonTablesPanel = new JPanel(new GridLayout(1, 2));
+		dbResultTableLeft = new JTable();
+		dbResultTableRight = new JTable();
+		comparisonTablesPanel.add(new JScrollPane(dbResultTableLeft));
+		comparisonTablesPanel.add(new JScrollPane(dbResultTableRight));
+		JPanel comparisonTopPanel = new JPanel(new BorderLayout());
+		comparisonTopPanel.add(connectionPanel, BorderLayout.NORTH);
+		comparisonTopPanel.add(dbButtonPanel, BorderLayout.CENTER);
+		comparisonTopPanel.add(comboBoxPanel, BorderLayout.SOUTH);
+		JPanel comparisonBottomPanel = new JPanel(new BorderLayout());
+		comparisonBottomPanel.add(comparisonTablesPanel, BorderLayout.CENTER);
+		JPanel searchPanelLeft = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+		JPanel searchPanelRight = new JPanel(new FlowLayout(FlowLayout.RIGHT));
+		searchFieldLeft = new JTextField(15);
+		searchFieldRight = new JTextField(15);
+		searchButtonLeft = new JButton("Search");
+		searchButtonRight = new JButton("Search");
+		searchButtonLeft.addActionListener(e -> searchInTable(dbResultTableLeft, searchFieldLeft.getText()));
+		searchButtonRight.addActionListener(e -> searchInTable(dbResultTableRight, searchFieldRight.getText()));
+		searchPanelLeft.add(new JLabel("Search: "));
+		searchPanelLeft.add(searchFieldLeft);
+		searchPanelLeft.add(searchButtonLeft);
+		searchPanelRight.add(new JLabel("Search: "));
+		searchPanelRight.add(searchFieldRight);
+		searchPanelRight.add(searchButtonRight);
+		JPanel searchButtonsPanel = new JPanel(new GridLayout(1, 2));
+		searchButtonsPanel.add(searchPanelLeft);
+		searchButtonsPanel.add(searchPanelRight);
+		comparisonBottomPanel.add(searchButtonsPanel, BorderLayout.SOUTH);
+		comparisonPanel.add(comparisonTopPanel, BorderLayout.NORTH);
+		comparisonPanel.add(comparisonBottomPanel, BorderLayout.CENTER);
+        // Add tabbed pane to the frame
+		add(tabbedPane);
+	}
+
+	private void uploadFile(int buttonNumber) {
+		JFileChooser fileChooser = new JFileChooser();
+	fileChooser.setFileSelectionMode(JFileChooser.FILES_ONLY);
+
+	int result = fileChooser.showOpenDialog(this);
+	if (result == JFileChooser.APPROVE_OPTION) {
+		File selectedFile = fileChooser.getSelectedFile();
+		processCSVFile(selectedFile, buttonNumber);
+	}
+	}
+	private void processCSVFile(File file, int buttonNumber) {
+		DefaultTableModel model = new DefaultTableModel();
+
+		try (BufferedReader br = new BufferedReader(new FileReader(file))) {
+			String line;
+			if ((line = br.readLine()) != null) {
+				String[] columnNames = line.split(",");
+				for (String columnName : columnNames) {
+					model.addColumn(columnName.trim());
+				}
+//                String[] data = line.split(",");
+//                model.addRow(data);
+			}
+			while ((line = br.readLine()) != null) {
+				String[] data = line.split(",");
+				model.addRow(data);
+			}
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+		// Display CSV data in the corresponding table
+		if (buttonNumber == 1) {
+			csvResultTableForButton1.setModel(model);
+		} else if (buttonNumber == 2) {
+			csvResultTableForButton2.setModel(model);
+		}
+	}
+
+	private JPanel createCsvPanel(String title, JTable table) {
+		JPanel panel = new JPanel(new BorderLayout());
+		panel.setBorder(BorderFactory.createTitledBorder(title));
+		JScrollPane scrollPane = new JScrollPane(table);
+		panel.add(scrollPane, BorderLayout.CENTER);
+		return panel;
+	}
+
+	
+	private void connectToOracleDatabase() throws SQLException, ClassNotFoundException {
+		String dbUrl = dbUrlField.getText();
+//		String username = usernameField.getText();
+//		String password = new String(passwordField.getPassword());
+		Connection connection = null;
+		try {
+			Class.forName("oracle.jdbc.driver.OracleDriver");
+			OracleDriver driver = new OracleDriver();
+            Properties prop = new Properties();
+
+            prop.setProperty(OracleConnection.CONNECTION_PROPERTY_THIN_NET_AUTHENTICATION_SERVICES,
+              "("+AnoServices.AUTHENTICATION_KERBEROS5+")");  
+            prop.setProperty(OracleConnection.CONNECTION_PROPERTY_THIN_NET_AUTHENTICATION_SERVICES,"( " + AnoServices.AUTHENTICATION_KERBEROS5 + " )");
+            prop.setProperty(OracleConnection.CONNECTION_PROPERTY_THIN_NET_AUTHENTICATION_KRB5_MUTUAL, "true");
+            connection  = driver.connect(dbUrl,prop);
+			//connection = DriverManager.getConnection(dbUrl, username, password);
+			JOptionPane.showMessageDialog(this, "Connected to the Oracle database successfully!");
+
+			File csvFile = new File("C:\\Users\\f80402\\Desktop\\PBI project\\PromptInfo.csv");
+			List<List<String>> oracleRecord = new LinkedList<List<String>>();
+
+			try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
+				String line;
+				String[] values = null;
+				while ((line = br.readLine()) != null) {
+					line = line.replaceAll("^\"|\"$", "");
+					values = line.split(",");
+					oracleRecord.add(Arrays.asList(values));
+				}
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+			for (int i = 1; i < oracleRecord.size(); i++) {
+				for (int j = 0; j < oracleRecord.get(i).size(); j++) {
+					if (j== 13) {
+						oracleMap.put(oracleRecord.get(i).get(16), oracleRecord.get(i).get(13));
+					}
+				}
+			}
+			System.err.println(oracleMap);
+
+			String MntcQuery = "Select * from sea_whse.d_mntc_vnd";
+			Statement statement = connection.createStatement();
+			ResultSet resultSet = statement.executeQuery(MntcQuery);
+			ResultSetMetaData metaData = resultSet.getMetaData();
+			int columnCount = metaData.getColumnCount();
+		   // List<String> list = new ArrayList<String>();
+			for (int i = 1; i <= columnCount; i++) {
+				String columnName = resultSet.getMetaData().getColumnName(i);
+				if (oracleMap.containsKey(columnName)) {
+					comboBox1.addItem(oracleMap.get(columnName));
+				}
+				
+				
+			}
+			String eqpQuery = "Select * from sea_whse.d_eqp";
+			Statement eqpStatement = connection.createStatement();
+			ResultSet eqpResultSet = eqpStatement.executeQuery(eqpQuery);
+			ResultSetMetaData eqpMetaData = eqpResultSet.getMetaData();
+			int eqpColumnCount = eqpMetaData.getColumnCount();
+
+			for (int i = 1; i <= eqpColumnCount; i++) {
+				String eqpColumnName = eqpResultSet.getMetaData().getColumnName(i);
+				if (oracleMap.containsKey(eqpColumnName)) {
+					comboBox1.addItem(oracleMap.get(eqpColumnName));
+				}
+			}
+
+		} finally {
+			try {
+				if (connection != null && !connection.isClosed()) {
+					connection.close();
+				}
+
+			} catch (SQLException e) {
+				JOptionPane.showMessageDialog(this, "Failed to connect to the database: " + e.getMessage(), "Error",
+						JOptionPane.ERROR_MESSAGE);
+				e.printStackTrace();
+			}
+
+		}
+	
+	}
+	
+	
+	private void connectToDenodoDatabase() throws SQLException, ClassNotFoundException {
+		String dbUrl = denodoUrlField.getText();
+		String username = denodoUsernameField.getText();
+		String password = new String(denodoPasswordField.getPassword());
+		Connection conn = null;
+		try {
+			 Class.forName("com.denodo.vdp.jdbc.Driver");
+			conn = DriverManager.getConnection(dbUrl, username, password);
+			File csvFile = new File("C:\\Users\\f80402\\Desktop\\PBI project\\datamodelschema.csv");
+			JOptionPane.showMessageDialog(this, "Connected to the Denono database successfully!");
+			List<List<String>> record = new LinkedList<List<String>>();
+			try (BufferedReader br = new BufferedReader(new FileReader(csvFile))) {
+				String line;
+				String[] values = null;
+				while ((line = br.readLine()) != null) {
+					line = line.replaceAll("^\"|\"$", "");
+					values = line.split(",");
+					record.add(Arrays.asList(values));
+				}
+
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+
+			for (int i = 1; i < record.size(); i++) {
+				for (int j = 0; j < record.get(i).size(); j++) {
+					if (j == 1) {
+						denodoMap.put(record.get(i).get(2), record.get(i).get(1));
+					}
+				}
+			}
+			System.out.println("map " + denodoMap);
+			String query = "Select * from dim_mntc_vnd";
+			Statement statement = conn.createStatement();
+			ResultSet resultSet = statement.executeQuery(query);
+			ResultSetMetaData metaData = resultSet.getMetaData();
+			int columnCount = metaData.getColumnCount();
+
+			for (int i = 1; i <= columnCount; i++) {
+				String columnNames = resultSet.getMetaData().getColumnName(i);
+				if (denodoMap.containsKey(columnNames)) {
+					comboBox2.addItem(denodoMap.get(columnNames));
+				}
+
+			}
+			String eqpQuery = "Select * from equipment";
+			Statement eqpStatement = conn.createStatement();
+			ResultSet eqpResultSet = eqpStatement.executeQuery(eqpQuery);
+			ResultSetMetaData eqpMetaData = eqpResultSet.getMetaData();
+			int eqpColumnCount = eqpMetaData.getColumnCount();
+
+			for (int i = 1; i <= eqpColumnCount; i++) {
+				String eqpColumnName = eqpResultSet.getMetaData().getColumnName(i);
+				if (denodoMap.containsKey(eqpColumnName)) {
+					comboBox2.addItem(denodoMap.get(eqpColumnName));
+				}
+			}
+
+			if (conn != null) {
+				System.out.println("Connection success");
+			}
+
+		} finally {
+			try {
+				if (conn != null && !conn.isClosed()) {
+					conn.close();
+				}
+
+			} catch (SQLException e) {
+				JOptionPane.showMessageDialog(this, "Failed to connect to the database: " + e.getMessage(), "Error",
+						JOptionPane.ERROR_MESSAGE);
+				e.printStackTrace();
+			}
+		}
+	
+	}
+	
+	
+	private void oracleColumnProperties(String selectedColumn) throws SQLException {
+		String dbUrl = dbUrlField.getText();
+//		String username = usernameField.getText();
+//		String password = new String(passwordField.getPassword());
+		Connection connection = null;
+		Statement statement = null;
+		ResultSet resultSet = null;
+		Statement eqpStatement = null;
+		ResultSet eqpResultSet = null;
+		try {
+			Class.forName("oracle.jdbc.driver.OracleDriver");
+			OracleDriver driver = new OracleDriver();
+            Properties prop = new Properties();
+
+            prop.setProperty(OracleConnection.CONNECTION_PROPERTY_THIN_NET_AUTHENTICATION_SERVICES,
+              "("+AnoServices.AUTHENTICATION_KERBEROS5+")");  
+            prop.setProperty(OracleConnection.CONNECTION_PROPERTY_THIN_NET_AUTHENTICATION_SERVICES,"( " + AnoServices.AUTHENTICATION_KERBEROS5 + " )");
+            prop.setProperty(OracleConnection.CONNECTION_PROPERTY_THIN_NET_AUTHENTICATION_KRB5_MUTUAL, "true");
+            connection  = driver.connect(dbUrl,prop);
+			//connection = DriverManager.getConnection(dbUrl, username, password);
+			DefaultTableModel model = new DefaultTableModel();
+			for (Map.Entry<String, String> entry : oracleMap.entrySet()) {
+				if (entry.getValue().equals(selectedColumn)) {
+					selectedColumn = entry.getKey();
+				}
+			}
+			if(selectedColumn.contains("MNTC")) {
+			String mntcQuery = "SELECT DISTINCT " + selectedColumn + ",COUNT(" + selectedColumn
+					+ ")FROM sea_whse.d_mntc_vnd GROUP BY " + selectedColumn + " ORDER BY " + selectedColumn + " ASC";
+			statement = connection.createStatement();
+			resultSet = statement.executeQuery(mntcQuery);
+			model.addColumn("");
+			while (resultSet.next()) {
+				if(resultSet.getString(1) != null &&  resultSet.getString(2) != null) {
+					model.addRow(new Object[] {resultSet.getString(1) + "    " + resultSet.getString(2) });
+				}
+				System.out.println("Oracle mntc result: " + resultSet.getString(1) + "    " + resultSet.getString(2));
+				//dbResultTableLeft.setModel(model);
+			}
+			}else if(selectedColumn.contains("EQP")) {
+			String eqpQuery = "SELECT DISTINCT " + selectedColumn + ",COUNT(" + selectedColumn
+					+ ")FROM sea_whse.d_eqp GROUP BY " + selectedColumn + " ORDER BY " + selectedColumn + " ASC";
+			eqpStatement = connection.createStatement();
+			eqpResultSet = eqpStatement.executeQuery(eqpQuery);
+			model.addColumn("");
+			while (eqpResultSet.next()) {
+				if( eqpResultSet.getString(1) != null  &&  eqpResultSet.getString(2) != null) {
+					model.addRow(new Object[] { eqpResultSet.getString(1) + ", " + eqpResultSet.getString(2) });
+			}
+				System.out.println("Oracle eqp result: " + eqpResultSet.getString(1) + "," + eqpResultSet.getString(2));
+				
+			}
+		}dbResultTableLeft.setModel(model);
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+		} finally {
+		
+			connection.close();
+		}
+
+	}
+
+	
+	private void denodoColumnProperties(String selectedColumn) throws SQLException {
+		String dbUrl = denodoUrlField.getText();
+		String username = denodoUsernameField.getText();
+		String password = new String(denodoPasswordField.getPassword());
+		Connection connection = null;
+		try {
+			Class.forName("com.denodo.vdp.jdbc.Driver");
+
+			connection = DriverManager.getConnection(dbUrl, username, password);
+			DefaultTableModel denodoModel = new DefaultTableModel();
+			for (Map.Entry<String, String> entry : denodoMap.entrySet()) {
+				if (entry.getValue().equals(selectedColumn)) {
+					selectedColumn = entry.getKey();
+				}
+			}
+			System.out.println(selectedColumn);
+			if(selectedColumn.contains("mntc")) {
+			String mntcQuery = "SELECT DISTINCT " + selectedColumn + ",COUNT(" + selectedColumn
+					+ ")FROM dim_mntc_vnd GROUP BY " + selectedColumn + " ORDER BY " + selectedColumn + " ASC";
+			Statement mntcStatement = connection.createStatement();
+			ResultSet mntcResultSet = mntcStatement.executeQuery(mntcQuery);
+			denodoModel.addColumn("");
+			while (mntcResultSet.next()) {
+				//String values = mntcResultSet.getString(1) + "," + mntcResultSet.getString(2);
+				denodoModel.addRow(new Object[] { mntcResultSet.getString(1) + "," + mntcResultSet.getString(2) });
+				//colList.add(values);
+				 System.out.println("Denodo mntc result: " + mntcResultSet.getString(1) + ","
+				 + mntcResultSet.getString(2));
+
+			}
+			}else if(selectedColumn.contains("eqp")) {
+				String eqpQuery = "SELECT DISTINCT " + selectedColumn + ",COUNT(" + selectedColumn
+						+ ")FROM equipment GROUP BY " + selectedColumn + " ORDER BY " + selectedColumn + " ASC";
+				Statement eqpStatement = connection.createStatement();
+				ResultSet eqpResultSet = eqpStatement.executeQuery(eqpQuery);
+				denodoModel.addColumn("");
+				while (eqpResultSet.next()) {
+					if( eqpResultSet.getString(1) != null  &&  eqpResultSet.getString(2) != null) {
+						denodoModel.addRow(new Object[] { eqpResultSet.getString(1) + ", " + eqpResultSet.getString(2) });
+				}
+					System.out.println("Denodo eqp result: " + eqpResultSet.getString(1) + "," + eqpResultSet.getString(2));
+					
+				}
+			}else {
+				String eqpQuery = "SELECT DISTINCT " + selectedColumn + ",COUNT(" + selectedColumn
+						+ ")FROM equipment GROUP BY " + selectedColumn + " ORDER BY " + selectedColumn + " ASC";
+				Statement eqpStatement = connection.createStatement();
+				ResultSet eqpResultSet = eqpStatement.executeQuery(eqpQuery);
+				denodoModel.addColumn("");
+				while (eqpResultSet.next()) {
+					if( eqpResultSet.getString(1) != null  &&  eqpResultSet.getString(2) != null) {
+						denodoModel.addRow(new Object[] { eqpResultSet.getString(1) + ", " + eqpResultSet.getString(2) });
+				}
+					System.out.println("Denodo eqp result: " + eqpResultSet.getString(1) + "," + eqpResultSet.getString(2));
+					
+				}
+			}
+			//Collections.sort(colList);
+			dbResultTableRight.setModel(denodoModel);
+			//System.out.println("colList..." + colList);
+
+
+		} catch (ClassNotFoundException e) {
+			e.printStackTrace();
+		} finally {
+
+			connection.close();
+		}
+	}
+
+	private void searchInTable(JTable table, String searchText) {
+		DefaultTableModel model = (DefaultTableModel) table.getModel();
+		TableRowSorter<DefaultTableModel> sorter = new TableRowSorter<>(model);
+		table.setRowSorter(sorter);
+		if (searchText.trim().length() == 0) {
+			sorter.setRowFilter(null);
+		} else {
+			sorter.setRowFilter(RowFilter.regexFilter("(?i)" + searchText.trim()));
+		}
+	}
+
+	public static void main(String[] args) {
+		SwingUtilities.invokeLater(() -> {
+			NewDashboardDesign dashboard = new NewDashboardDesign();
+			dashboard.setVisible(true);
+		});
+	}
+}
